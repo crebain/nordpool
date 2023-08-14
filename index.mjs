@@ -17,13 +17,15 @@ async function main() {
     let latestResultDate = "2022-11-29T00:00:00";
     let latestResultRows = null;
 
-    const csvHeaders = ['DATE CE(S)T', ...Array(24).keys()].map(i => String(i).padStart(2, '0'));
+    const csvHeaders = ['StartTime CE(S)T', 'EndTime CE(S)T', 'EUR/MWh'];
     console.log(csvHeaders.join('\t'));
 
     resources.forEach(element => {
         if (element.response.data.LatestResultDate != latestResultDate && latestResultRows != null) {
-            const csvRow = [latestResultDate, ...latestResultRows.filter(r => !r.IsExtraRow).map(row => row.Columns[0].Value)];
-            console.log(csvRow.join('\t'));
+            latestResultRows.filter(r => !r.IsExtraRow).forEach(row => {
+                const csvRow = [row.StartTime, row.EndTime, row.Columns[0].Value];
+                console.log(csvRow.join('\t'));
+            });
         }
 
         latestResultRows = element.response.data.Rows;
@@ -31,8 +33,10 @@ async function main() {
         // console.log(element);
     });
 
-    const csvRow = [latestResultDate, ...latestResultRows.filter(r => !r.IsExtraRow).map(row => row.Columns[0].Value)];
-    console.log(csvRow.join('\t'));
+    latestResultRows.filter(r => !r.IsExtraRow).forEach(row => {
+        const csvRow = [row.StartTime, row.EndTime, row.Columns[0].Value];
+        console.log(csvRow.join('\t'));
+    });
 }
 
 main().catch((error) => {
