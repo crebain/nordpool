@@ -52,14 +52,16 @@ async function main() {
         const csvHeaders = ['StartTime', 'EndTime', 'EUR/MWh'];
         console.log(csvHeaders.join('\t'));
 
-        for await (const element of iterator) {
-            if (element.response.data.LatestResultDate != latestResultDate && latestResultRows != null) {
-                printTsvResults(latestResultRows);
-            }
+        for await (const page of iterator) {
+            for (const element of page.resources) {
+                if (element.response.data.LatestResultDate != latestResultDate && latestResultRows != null) {
+                    printTsvResults(latestResultRows);
+                }
 
-            latestResultRows = element.response.data.Rows;
-            latestResultDate = element.response.data.LatestResultDate;
-            // console.log(element);
+                latestResultRows = element.response.data.Rows;
+                latestResultDate = element.response.data.LatestResultDate;
+                // console.log(element);
+            }
         }
 
         printTsvResults(latestResultRows);
