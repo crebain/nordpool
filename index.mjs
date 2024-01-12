@@ -1,16 +1,12 @@
 import { DefaultAzureCredential } from "@azure/identity";
 import { CosmosClient } from "@azure/cosmos";
+import process from 'process';
 
 process.env.TZ = 'Europe/Oslo';
 
 const endpoint = "https://nordpool-ahead-hourly.documents.azure.com:443/";
 const databaseName = 'nordpool';
 const containerName = 'hourly';
-const credential = new DefaultAzureCredential();
-const options = { endpoint, aadCredentials: credential };
-const client = new CosmosClient(options);
-const database = client.database(databaseName);
-const container = database.container(containerName);
 const vilniusFormat = new Intl.DateTimeFormat('sv-SE',
     {
         timeZone: 'Europe/Vilnius',
@@ -40,28 +36,50 @@ function printTsvResults(latestResultRows) {
 }
 
 async function main() {
-    const { resources } = await container.items.query('SELECT * FROM c')
-        .fetchAll();
+    const credential = new DefaultAzureCredential();
+    const options = { endpoint, aadCredentials: credential };
+    const client = new CosmosClient(options);
+    const database = client.database(databaseName);
+    const container = database.container(containerName);
+    const response = await container.items.query('SELECT * FROM c')
+    const iterator = response.getAsyncIterator();
 
-    let latestResultDate = "2022-11-29T00:00:00";
-    let latestResultRows = null;
+    try {
 
-    const csvHeaders = ['StartTime', 'EndTime', 'EUR/MWh'];
-    console.log(csvHeaders.join('\t'));
+        let latestResultDate = "2022-11-29T00:00:00";
+        let latestResultRows = null;
 
-    resources.forEach(element => {
-        if (element.response.data.LatestResultDate != latestResultDate && latestResultRows != null) {
-            printTsvResults(latestResultRows);
+        const csvHeaders = ['StartTime', 'EndTime', 'EUR/MWh'];
+        console.log(csvHeaders.join('\t'));
+
+        for await (const element of iterator) {
+            if (element.response.data.LatestResultDate != latestResultDate && latestResultRows != null) {
+                printTsvResults(latestResultRows);
+            }
+
+            latestResultRows = element.response.data.Rows;
+            latestResultDate = element.response.data.LatestResultDate;
+            // console.log(element);
         }
 
-        latestResultRows = element.response.data.Rows;
-        latestResultDate = element.response.data.LatestResultDate;
-        // console.log(element);
-    });
+        printTsvResults(latestResultRows);
+    }
+    catch (error) {
+        console.error(`Inner: ${error}`);
+    }
 
-    printTsvResults(latestResultRows);
 }
 
-main().catch((error) => {
-    console.error(error);
+process.on('unhandledRejection', e => {
+    console.error(`Unhandled rejection ${e}`);
 });
+
+
+try {
+    await main();
+}
+catch (error) {
+    console.error(`Outer: ${error}`);
+}
+
+process.exit();
