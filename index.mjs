@@ -1,8 +1,16 @@
 import { DefaultAzureCredential } from "@azure/identity";
 import { CosmosClient } from "@azure/cosmos";
+import Globalize from "globalize";
+import likelySubtags from 'cldr-core/supplemental/likelySubtags.json' assert { type: 'json' };
+import noNumbers from 'cldr-numbers-modern/main/no/numbers.json' assert { type: 'json' };
+import numbers from 'cldr-core/supplemental/numberingSystems.json' assert { type: 'json' };
 import process from 'process';
 
 process.env.TZ = 'Europe/Oslo';
+
+Globalize.load(likelySubtags, noNumbers, numbers);
+const noLocale = new Globalize('no');
+const numberParser = noLocale.numberParser();
 
 const endpoint = "https://nordpool-ahead-hourly.documents.azure.com:443/";
 const databaseName = 'nordpool';
@@ -20,26 +28,6 @@ const vilniusFormat = new Intl.DateTimeFormat('sv-SE',
         timeZoneName: 'longOffset'
     });
 
-class NumberParser {
-    constructor(locale) {
-        const parts = new Intl.NumberFormat(locale).formatToParts(12345.6);
-        const numerals = [...new Intl.NumberFormat(locale, { useGrouping: false }).format(9876543210)].reverse();
-        const index = new Map(numerals.map((d, i) => [d, i]));
-        this._group = new RegExp(`[${parts.find(d => d.type === "group").value}]`, "g");
-        this._decimal = new RegExp(`[${parts.find(d => d.type === "decimal").value}]`);
-        this._numeral = new RegExp(`[${numerals.join("")}]`, "g");
-        this._index = d => index.get(d);
-    }
-    parse(string) {
-        return (string = string.trim()
-            .replace(this._group, "")
-            .replace(this._decimal, ".")
-            .replace(this._numeral, this._index)) ? +string : NaN;
-    }
-}
-
-const nordpoolNumbers = new NumberParser('sv-SE');
-
 function getVilniusISOString(date) {
     const parts = vilniusFormat.formatToParts(date);
     var tzOffset = parts[12].value.slice(3); // Remove GMT from GMT+03:00
@@ -50,7 +38,7 @@ function printTsvResults(latestResultRows) {
     latestResultRows.filter(r => !r.IsExtraRow).forEach(row => {
         const startTime = new Date(Date.parse(row.StartTime));
         const endTime = new Date(Date.parse(row.EndTime));
-        const csvRow = [getVilniusISOString(startTime), getVilniusISOString(endTime), nordpoolNumbers.parse(row.Columns[0].Value)];
+        const csvRow = [getVilniusISOString(startTime), getVilniusISOString(endTime), numberParser(row.Columns[0].Value)];
         console.log(csvRow.join('\t'));
     });
 }
