@@ -18,7 +18,27 @@ const vilniusFormat = new Intl.DateTimeFormat('sv-SE',
         second: '2-digit',
         hour12: false,
         timeZoneName: 'longOffset'
-    })
+    });
+
+class NumberParser {
+    constructor(locale) {
+        const parts = new Intl.NumberFormat(locale).formatToParts(12345.6);
+        const numerals = [...new Intl.NumberFormat(locale, { useGrouping: false }).format(9876543210)].reverse();
+        const index = new Map(numerals.map((d, i) => [d, i]));
+        this._group = new RegExp(`[${parts.find(d => d.type === "group").value}]`, "g");
+        this._decimal = new RegExp(`[${parts.find(d => d.type === "decimal").value}]`);
+        this._numeral = new RegExp(`[${numerals.join("")}]`, "g");
+        this._index = d => index.get(d);
+    }
+    parse(string) {
+        return (string = string.trim()
+            .replace(this._group, "")
+            .replace(this._decimal, ".")
+            .replace(this._numeral, this._index)) ? +string : NaN;
+    }
+}
+
+const nordpoolNumbers = new NumberParser('sv-SE');
 
 function getVilniusISOString(date) {
     const parts = vilniusFormat.formatToParts(date);
@@ -30,7 +50,7 @@ function printTsvResults(latestResultRows) {
     latestResultRows.filter(r => !r.IsExtraRow).forEach(row => {
         const startTime = new Date(Date.parse(row.StartTime));
         const endTime = new Date(Date.parse(row.EndTime));
-        const csvRow = [getVilniusISOString(startTime), getVilniusISOString(endTime), row.Columns[0].Value];
+        const csvRow = [getVilniusISOString(startTime), getVilniusISOString(endTime), nordpoolNumbers.parse(row.Columns[0].Value)];
         console.log(csvRow.join('\t'));
     });
 }
